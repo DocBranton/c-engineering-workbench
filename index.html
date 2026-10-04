@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Engineering Workbench</title>
+  <meta name="description" content="Open, inspect, measure and document STEP, IGES, BREP, STL, OBJ and glTF models in the browser." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6fed'/%3E%3Cpath d='M8 21l8-13 8 13z' fill='none' stroke='white' stroke-width='2.6' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Engineering Workbench</span>
+      </div>
+      <nav class="breadcrumbs" id="breadcrumbs" aria-label="Project location"></nav>
+      <div class="topbar-right">
+        <label class="search">
+          <span class="icon" data-icon="search"></span>
+          <input id="globalSearch" type="search" placeholder="Search models, requirements, drawings..." autocomplete="off" />
+          <div class="search-results" id="searchResults" hidden></div>
+        </label>
+        <button class="icon-btn" id="helpBtn" title="Keyboard shortcuts and help"><span class="icon" data-icon="help"></span></button>
+        <div class="menu-wrap">
+          <button class="icon-btn" id="moreBtn" title="More"><span class="icon" data-icon="more"></span></button>
+          <div class="menu" id="moreMenu" hidden>
+            <button data-action="project-import">Import project data (.json)</button>
+            <button data-action="project-export">Export project data (.json)</button>
+            <button data-action="project-reset">Reset project data</button>
+            <hr />
+            <button data-action="units-in">Display units: inches</button>
+            <button data-action="units-mm">Display units: millimeters</button>
+          </div>
+        </div>
+        <button class="avatar" id="avatarBtn" title="Edit project details">EW</button>
+      </div>
+    </header>
+
+    <!-- Tabs + actions -->
+    <div class="tabbar">
+      <div class="tabs" role="tablist">
+        <button class="tab active" role="tab" data-tab="model"><span class="icon" data-icon="box"></span>Model</button>
+        <button class="tab" role="tab" data-tab="drawings">Drawings</button>
+        <button class="tab" role="tab" data-tab="requirements">Requirements</button>
+        <button class="tab" role="tab" data-tab="analysis">Analysis</button>
+        <button class="tab" role="tab" data-tab="manufacturing">Manufacturing</button>
+        <button class="tab" role="tab" data-tab="thread">Digital Thread</button>
+      </div>
+      <div class="actions">
+        <button class="btn" id="openBtn"><span class="icon" data-icon="upload"></span>Open</button>
+        <div class="menu-wrap">
+          <button class="btn" id="exportBtn"><span class="icon" data-icon="download"></span>Export<span class="icon chev" data-icon="chevron-down"></span></button>
+          <div class="menu right" id="exportMenu" hidden>
+            <button data-action="export-glb">Model as glTF binary (.glb)</button>
+            <button data-action="export-stl">Model as STL (.stl)</button>
+            <button data-action="export-png">Viewport screenshot (.png)</button>
+            <button data-action="export-drawing">Drawing sheet (.png)</button>
+            <button data-action="project-export">Project data (.json)</button>
+          </div>
+        </div>
+        <button class="btn primary" id="sampleBtn"><span class="icon" data-icon="box"></span>Sample model</button>
+        <input type="file" id="fileInput" hidden accept=".step,.stp,.iges,.igs,.brep,.brp,.stl,.obj,.glb,.gltf" />
+        <input type="file" id="projectInput" hidden accept=".json" />
+      </div>
+    </div>
+
+    <!-- Model workspace -->
+    <main class="workspace" id="view-model">
+      <aside class="panel tree-panel">
+        <div class="panel-head"><h2>Model Tree</h2></div>
+        <label class="search small">
+          <span class="icon" data-icon="search"></span>
+          <input id="treeSearch" type="search" placeholder="Search features..." autocomplete="off" />
+        </label>
+        <div class="tree" id="tree" role="tree"></div>
+      </aside>
+
+      <section class="viewport" id="viewport">
+        <div class="toolbar" id="toolbar" role="toolbar" aria-label="Viewer tools">
+          <button class="tool active" data-tool="select" title="Select (S)"><span class="icon" data-icon="pointer"></span>Select</button>
+          <button class="tool" data-tool="pan" title="Pan (P)"><span class="icon" data-icon="hand"></span>Pan</button>
+          <button class="tool" data-tool="rotate" title="Rotate (R)"><span class="icon" data-icon="rotate"></span>Rotate</button>
+          <button class="tool" data-tool="zoom" title="Zoom (Z)"><span class="icon" data-icon="zoom"></span>Zoom</button>
+          <button class="tool" data-cmd="fit" title="Fit (F)"><span class="icon" data-icon="fit"></span>Fit</button>
+          <button class="tool" data-cmd="section" title="Section (X)"><span class="icon" data-icon="section"></span>Section</button>
+          <button class="tool" data-tool="measure" title="Measure (M)"><span class="icon" data-icon="ruler"></span>Measure</button>
+          <button class="tool" data-cmd="explode" title="Explode (E)"><span class="icon" data-icon="explode"></span>Explode</button>
+          <button class="tool" data-cmd="hide" title="Show/Hide selection (H)"><span class="icon" data-icon="eye"></span>Show/Hide</button>
+          <button class="tool" data-cmd="isolate" title="Isolate selection (I)"><span class="icon" data-icon="isolate"></span>Isolate</button>
+          <button class="tool" data-cmd="appearance" title="Appearance"><span class="icon" data-icon="appearance"></span>Appearance</button>
+          <button class="tool" data-cmd="views" title="Standard views"><span class="icon" data-icon="views"></span>Views<span class="icon chev" data-icon="chevron-down"></span></button>
+          <button class="tool" data-cmd="annotations" title="Annotations (A)"><span class="icon" data-icon="tag"></span>Annotations</button>
+        </div>
+
+        <div class="pick-filter" id="pickFilter" role="radiogroup" aria-label="Selection filter">
+          <button class="active" data-pick="part">Parts</button>
+          <button data-pick="feature">Features</button>
+          <button data-pick="face">Faces</button>
+        </div>
+
+        <div class="popover" id="sectionPop" hidden>
+          <div class="pop-title">Section plane</div>
+          <div class="seg" id="sectionAxis"><button data-axis="x">X</button><button data-axis="y">Y</button><button class="active" data-axis="z">Z</button></div>
+          <input type="range" id="sectionOffset" min="0" max="1" step="0.001" value="0.5" aria-label="Section offset" />
+          <div class="pop-row"><span id="sectionValue">0.000</span><button class="link-btn" id="sectionFlip">Flip side</button><button class="link-btn" id="sectionOff">Turn off</button></div>
+        </div>
+        <div class="popover" id="explodePop" hidden>
+          <div class="pop-title">Explode</div>
+          <input type="range" id="explodeAmount" min="0" max="1" step="0.01" value="0" aria-label="Explode amount" />
+          <div class="pop-row"><span id="explodeValue">0%</span><button class="link-btn" id="explodeReset">Collapse</button></div>
+        </div>
+        <div class="popover" id="appearancePop" hidden>
+          <div class="pop-title">Display</div>
+          <div class="seg col" id="displayMode">
+            <button class="active" data-mode="shaded-edges">Shaded with edges</button>
+            <button data-mode="shaded">Shaded</button>
+            <button data-mode="wireframe">Wireframe</button>
+            <button data-mode="xray">X-ray</button>
+          </div>
+          <div class="pop-title">Material look</div>
+          <div class="seg col" id="materialLook">
+            <button data-look="original">File colors</button>
+            <button class="active" data-look="titanium">Titanium</button>
+            <button data-look="aluminum">Aluminum</button>
+            <button data-look="steel">Dark steel</button>
+          </div>
+        </div>
+        <div class="popover" id="viewsPop" hidden>
+          <div class="seg col" id="viewsList">
+            <button data-view="iso">Isometric</button>
+            <button data-view="front">Front</button>
+            <button data-view="back">Back</button>
+            <button data-view="top">Top</button>
+            <button data-view="bottom">Bottom</button>
+            <button data-view="left">Left</button>
+            <button data-view="right">Right</button>
+          </div>
+          <label class="check"><input type="checkbox" id="orthoToggle" /> Orthographic</label>
+        </div>
+
+        <div class="canvas-host" id="canvasHost"></div>
+        <div class="labels" id="labels"></div>
+        <div class="viewcube" id="viewcube" title="Click a face to snap the view"></div>
+        <svg class="triad" id="triad" viewBox="0 0 90 90" aria-hidden="true"></svg>
+        <div class="measure-readout" id="measureReadout" hidden></div>
+        <div class="status-bar" id="statusBar"></div>
+
+        <div class="drop-hint" id="dropHint" hidden>
+          <div>Drop a CAD file to open it</div>
+          <small>STEP, IGES, BREP, STL, OBJ, glTF</small>
+        </div>
+        <div class="loading" id="loading" hidden>
+          <div class="spinner"></div>
+          <div id="loadingText">Loading</div>
+        </div>
+        <div class="empty" id="emptyState" hidden>
+          <h3>Open a model to get started</h3>
+          <p>Drop a STEP, IGES, BREP, STL, OBJ or glTF file here. Files are read in your browser and never uploaded.</p>
+          <div class="empty-actions">
+            <button class="btn primary" data-action="open">Open file</button>
+            <button class="btn" data-action="sample">Load sample bracket</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel details-panel" id="details"></aside>
+
+      <section class="bottom">
+        <div class="card" id="drawingCard">
+          <div class="card-head">
+            <h3>Drawings (2D)</h3>
+            <div class="card-tools">
+              <button class="icon-btn sm" data-goto="drawings" title="Open drawing"><span class="icon" data-icon="expand"></span></button>
+              <button class="icon-btn sm" id="drawingRefresh" title="Regenerate drawing"><span class="icon" data-icon="refresh"></span></button>
+            </div>
+          </div>
+          <div class="drawing-thumb" id="drawingThumb"></div>
+        </div>
+        <div class="card" id="reqCard">
+          <div class="card-head"><h3>Requirements</h3><button class="icon-btn sm" data-goto="requirements" title="Open requirements"><span class="icon" data-icon="expand"></span></button></div>
+          <div class="card-body" id="reqCompact"></div>
+        </div>
+        <div class="card" id="mfgCard">
+          <div class="card-head"><h3>Manufacturing</h3><button class="icon-btn sm" data-goto="manufacturing" title="Open manufacturing"><span class="icon" data-icon="expand"></span></button></div>
+          <div class="card-body" id="mfgCompact"></div>
+        </div>
+        <div class="card" id="threadCard">
+          <div class="card-head"><h3>Digital Thread</h3><button class="icon-btn sm" data-goto="thread" title="Open digital thread"><span class="icon" data-icon="expand"></span></button></div>
+          <div class="card-body" id="threadCompact"></div>
+        </div>
+        <div class="card wingman" id="wingmanCard">
+          <div class="card-head">
+            <h3><span class="icon spark" data-icon="sparkle"></span>AI Wingman</h3>
+            <div class="card-tools">
+              <button class="icon-btn sm" id="wingmanSettings" title="Assistant settings"><span class="icon" data-icon="settings"></span></button>
+              <button class="icon-btn sm" id="wingmanClear" title="Clear conversation"><span class="icon" data-icon="x"></span></button>
+            </div>
+          </div>
+          <div class="chat" id="chat" aria-live="polite"></div>
+          <form class="chat-input" id="chatForm">
+            <input id="chatText" placeholder="Ask a question about this model..." autocomplete="off" />
+            <button type="submit" class="send" title="Send"><span class="icon" data-icon="send"></span></button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <!-- Full-page views -->
+    <main class="page" id="view-drawings" hidden>
+      <div class="page-head">
+        <h2>Drawings</h2>
+        <div class="page-actions">
+          <button class="btn" id="drawingRegen"><span class="icon" data-icon="refresh"></span>Regenerate</button>
+          <button class="btn primary" data-action="export-drawing"><span class="icon" data-icon="download"></span>Download PNG</button>
+        </div>
+      </div>
+      <p class="page-note">Third-angle orthographic projection generated from the visible geometry, with hidden lines removed. Hide parts or change the section to update it.</p>
+      <div class="drawing-full" id="drawingFull"></div>
+    </main>
+    <main class="page" id="view-requirements" hidden>
+      <div class="page-head">
+        <h2>Requirements</h2>
+        <div class="page-actions"><button class="btn primary" id="reqAdd"><span class="icon" data-icon="plus"></span>Add requirement</button></div>
+      </div>
+      <div id="reqFull"></div>
+    </main>
+    <main class="page" id="view-analysis" hidden>
+      <div class="page-head">
+        <h2>Analysis</h2>
+        <div class="page-actions" id="analysisActions"></div>
+      </div>
+      <div id="analysisFull"></div>
+    </main>
+    <main class="page" id="view-manufacturing" hidden>
+      <div class="page-head"><h2>Manufacturing</h2></div>
+      <div id="mfgFull"></div>
+    </main>
+    <main class="page" id="view-thread" hidden>
+      <div class="page-head">
+        <h2>Digital Thread</h2>
+        <div class="page-actions"><button class="btn primary" id="threadAdd"><span class="icon" data-icon="plus"></span>Add link</button></div>
+      </div>
+      <div id="threadFull"></div>
+    </main>
+  </div>
+
+  <dialog class="modal" id="modal"></dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
